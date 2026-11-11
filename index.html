@@ -36,6 +36,8 @@
   .btn-generate:hover { opacity: .85; }
   .btn-outline { width: 100%; padding: 9px; background: transparent; color: var(--text-muted); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 12px; font-weight: 500; cursor: pointer; margin-top: 6px; font-family: inherit; }
   .btn-outline:hover { background: var(--bg); }
+  .action-row { display: flex; gap: 8px; margin-top: 6px; }
+  .action-row .btn-outline { flex: 1; width: auto; margin-top: 0; }
   .btn-outline.green { color: var(--green); border-color: #9fe1cb; }
   .btn-outline.green:hover { background: var(--green-bg); }
   .btn-outline.danger { color: var(--red); border-color: #f5c4b3; }
@@ -93,7 +95,7 @@
       <div class="card-label">기본 정보</div>
       <div class="grid2">
         <div class="field"><label>기준 월 (활동 월) <span style="color:var(--text-hint);font-weight:400">· 발송 달의 전월이 자동 입력돼요</span></label><div style="display:flex;gap:6px"><input type="hidden" id="r-year"><input type="text" id="r-month" placeholder="예) 10 또는 10월" oninput="onMonthInput()"></div></div>
-        <div class="field"><label>발송 대상 선택</label><select id="r-person" onchange="onPersonChange()"><option value="">— 선택 —</option></select><button class="btn-sm" style="align-self:flex-start" onclick="copyName(this)">이름 복사 (카톡 검색용)</button></div>
+        <div class="field"><label>발송 대상 선택</label><select id="r-person" onchange="onPersonChange()"><option value="">— 선택 —</option></select><button class="btn-sm" style="align-self:flex-start" onclick="copyName(this)">이름 복사 (메신저 검색용)</button></div>
       </div>
       <div class="prefill-hint" id="prefill-hint"></div>
     </div>
@@ -142,8 +144,10 @@
     <button class="btn-generate" onclick="generate()">템플릿 생성 →</button>
     <div class="template-out" id="template-out">
       <div class="template-box" id="tpl-text"></div>
-      <button class="btn-outline" onclick="copyTpl()">복사하기</button>
-      <button class="btn-outline green" onclick="copyAndSent()">복사하고 발송 완료 → 다음 상담사</button>
+      <div class="action-row">
+        <button class="btn-outline" onclick="copyTpl()">복사하기</button>
+        <button class="btn-outline green" onclick="copyAndSent()">복사 및 발송 완료</button>
+      </div>
     </div>
   </div>
 
