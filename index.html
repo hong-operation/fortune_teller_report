@@ -396,53 +396,65 @@ function calcNewTarget(newC) {
   return newC + 20;
 }
 
+function cstGoalLine(parsed) {
+  const t = calcCstTarget(parsed);
+  return '목표를 평균 상담 시간 ' + t + roSuffix(t) + ' 잡고서 해보시면 좋을 것 같아요!';
+}
+
 function getGoalLine(cstParsed, revC, newC) {
   const cstMin = cstParsed ? cstParsed.totalSec / 60 : 0;
   const rev = isNaN(revC) ? 0 : revC;
   const newCnt = isNaN(newC) ? 0 : newC;
+  const hasCst = !!cstParsed, hasNew = !isNaN(newC);
   const revIsZero = rev === 0;
 
   // 1. 신규 유입 10명 이하 → 최우선
-  if (newCnt <= 10) {
+  if (!hasCst) {   // 상담 시간 미입력 → 입력된 지표만으로 판단
+    if (hasNew && newCnt <= 10) return '목표를 신규 내담자 ' + calcNewTarget(newCnt) + '명 유입으로 잡고서 해보시면 좋을 것 같아요!';
+    if (!revIsZero) return '목표를 재방문율 ' + calcRevTarget(rev) + '%로 잡고서 해보시면 좋을 것 같아요!';
+    if (hasNew) return '목표를 신규 내담자 ' + calcNewTarget(newCnt) + '명 유입으로 잡고서 해보시면 좋을 것 같아요!';
+    return null;
+  }
+  if (hasNew && newCnt <= 10) {
     return '목표를 신규 내담자 ' + calcNewTarget(newCnt) + '명 유입으로 잡고서 해보시면 좋을 것 같아요!';
   }
 
   // 2. 신규 유입 11~20명 + 상담시간 20분↑ + 재방문율 50%↑ → 신규 유입
-  if (newCnt <= 20 && cstMin >= 20 && rev >= 50) {
+  if (hasNew && newCnt <= 20 && cstMin >= 20 && rev >= 50) {
     return '목표를 신규 내담자 ' + calcNewTarget(newCnt) + '명 유입으로 잡고서 해보시면 좋을 것 같아요!';
   }
 
   // 3. 상담시간 20분↑ + 재방문율 50%↑ + 신규 유입 21명 초과
-  if (cstMin >= 20 && rev >= 50 && newCnt > 20) {
+  if (hasNew && cstMin >= 20 && rev >= 50 && newCnt > 20) {
     return '목표를 신규 내담자 ' + calcNewTarget(newCnt) + '명 유입으로 잡고서 해보시면 좋을 것 같아요!';
   }
 
   // 4. 상담시간 20분↑ + 재방문율 50% 미만
   if (cstMin >= 20 && rev < 50) {
-    if (revIsZero) return '목표를 평균 상담 시간 ' + calcCstTarget(cstParsed) + '으로 잡고서 해보시면 좋을 것 같아요!';
+    if (revIsZero) return cstGoalLine(cstParsed);
     return '목표를 재방문율 ' + calcRevTarget(rev) + '%로 잡고서 해보시면 좋을 것 같아요!';
   }
 
   // 5. 상담시간 20분 미만 + 재방문율 50%↑
   if (cstMin < 20 && rev >= 50) {
-    return '목표를 평균 상담 시간 ' + calcCstTarget(cstParsed) + '으로 잡고서 해보시면 좋을 것 같아요!';
+    return cstGoalLine(cstParsed);
   }
 
   // 6. 상담시간 13분 미만 + 재방문율 30%↑ (재방문율 0% 제외)
   if (cstMin < 13 && rev >= 30 && !revIsZero) {
-    return '목표를 평균 상담 시간 ' + calcCstTarget(cstParsed) + '으로 잡고서 해보시면 좋을 것 같아요!';
+    return cstGoalLine(cstParsed);
   }
 
   // 7. 상담시간 13분↑ + 재방문율 30% 미만
   if (cstMin >= 13 && rev < 30) {
-    if (revIsZero) return '목표를 평균 상담 시간 ' + calcCstTarget(cstParsed) + '으로 잡고서 해보시면 좋을 것 같아요!';
+    if (revIsZero) return cstGoalLine(cstParsed);
     return '목표를 재방문율 ' + calcRevTarget(rev) + '%로 잡고서 해보시면 좋을 것 같아요!';
   }
 
   // 8. 상담시간 10분 미만 + 재방문율 10%↑ + 재방문율 30% 미만 → 랜덤
   if (cstMin < 10 && rev >= 10 && rev < 30) {
     const opts = [
-      '목표를 평균 상담 시간 ' + calcCstTarget(cstParsed) + '으로 잡고서 해보시면 좋을 것 같아요!',
+      cstGoalLine(cstParsed),
       '목표를 재방문율 ' + calcRevTarget(rev) + '%로 잡고서 해보시면 좋을 것 같아요!'
     ];
     return pickRandom(opts);
@@ -450,46 +462,45 @@ function getGoalLine(cstParsed, revC, newC) {
 
   // 9. 상담시간 10분↑ + 재방문율 10% 미만
   if (cstMin >= 10 && rev < 10) {
-    if (revIsZero) return '목표를 평균 상담 시간 ' + calcCstTarget(cstParsed) + '으로 잡고서 해보시면 좋을 것 같아요!';
+    if (revIsZero) return cstGoalLine(cstParsed);
     return '목표를 재방문율 ' + calcRevTarget(rev) + '%로 잡고서 해보시면 좋을 것 같아요!';
   }
 
   // 기본값: 재방문율 목표
   if (!revIsZero) return '목표를 재방문율 ' + calcRevTarget(rev) + '%로 잡고서 해보시면 좋을 것 같아요!';
-  return '목표를 평균 상담 시간 ' + calcCstTarget(cstParsed) + '으로 잡고서 해보시면 좋을 것 같아요!';
+  return cstGoalLine(cstParsed);
 }
 
 // ── 상담시간/재방문율 문구 ─────────────────────────
+function fmtRev(r) { return parseFloat(r.toFixed(1)) + '%'; }   // 소수 첫째 자리까지 표시 (예: 29.6%)
+
+function joinClauses(parts, praise, conns) {
+  const p = parts.filter(Boolean);
+  if (!p.length) return '';
+  const cs = conns ? conns.slice(conns.length - (p.length - 1)) : null;
+  let s = '';
+  for (let i = 0; i < p.length - 1; i++) s += p[i] + ((cs && cs[i]) || (i === 0 ? '이고, ' : '이며 '));
+  const last = p[p.length - 1];
+  return s + last + roSuffix(last) + (praise ? ' 잘해주고 계세요!' : ' 확인됩니다.');
+}
+
 function getConsultLine(cstParsed, revC, calC) {
-  const cstMin = cstParsed ? cstParsed.totalSec / 60 : 0;
+  const hasCst = !!cstParsed, hasCal = !isNaN(calC);
+  const cstMin = hasCst ? cstParsed.totalSec / 60 : 0;
   const rev = isNaN(revC) ? 0 : revC;
-  const cal = isNaN(calC) ? 0 : Math.round(calC);
   const revIsZero = rev === 0;
-  const cstDisplay = fmtMinSec(cstParsed);
+  const cstP = hasCst ? '평균 상담 시간은 ' + fmtMinSec(cstParsed) : null;
+  const calP = hasCal ? '통화 상담 건은 ' + Math.round(calC) + '건' : null;
+  const revP = revIsZero ? null : '재방문율은 ' + fmtRev(rev);
 
-  if (revIsZero) {
-    return '평균 상담 시간은 ' + cstDisplay + '이고, 통화 상담 건은 ' + cal + '건으로 확인됩니다.';
-  }
-
-  // 13분 미만 + 30% 미만 → 코멘트 없이
-  if (cstMin < 13 && rev < 30) {
-    return '평균 상담 시간은 ' + cstDisplay + '이고, 통화 상담 건은 ' + cal + '건이며 재방문율은 ' + rev.toFixed(0) + '%로 확인됩니다.';
-  }
-  // 13분 미만 + 30% 이상 → 상담시간 먼저
-  if (cstMin < 13 && rev >= 30) {
-    return '평균 상담 시간은 ' + cstDisplay + '이고, 통화 상담 건은 ' + cal + '건이며 재방문율은 ' + rev.toFixed(0) + '%로 잘해주고 계세요!';
-
-  }
-  // 13분 이상 + 30% 미만 → 재방문율 먼저
-  if (cstMin >= 13 && rev < 30) {
-    return '통화 상담 건은 ' + cal + '건이며 재방문율은 ' + rev.toFixed(0) + '%이고, 평균 상담 시간은 ' + cstDisplay + roSuffix(cstDisplay) + ' 잘해주고 계세요!';
-  }
-  // 13분 이상 + 30% 이상 (20분↑ 50%↑ 포함) → 상담시간 먼저
-  return '평균 상담 시간은 ' + cstDisplay + '이고, 통화 상담 건은 ' + cal + '건이며 재방문율은 ' + rev.toFixed(0) + '%로 잘해주고 계세요!';
+  if (revIsZero) return joinClauses([cstP, calP], false);
+  if (!hasCst) return joinClauses([calP, revP], rev >= 30);
+  if (cstMin >= 13 && rev < 30) return joinClauses([calP, revP, cstP], true, ['이며 ', '이고, ']);
+  return joinClauses([cstP, calP, revP], !(cstMin < 13 && rev < 30));
 }
 
 // ── 접속/매출 코멘트 ──────────────────────────────
-function getAccSalComment(accRate, salRate, cstParsed, revC, newC) {
+function getAccSalComment(accRate, salRate, cstParsed, revC, newC, month) {
   const accDown = accRate !== null && accRate < 0;
   const accUp   = accRate !== null && accRate > 0;
   const salUp   = salRate !== null && salRate > 0;
@@ -500,10 +511,11 @@ function getAccSalComment(accRate, salRate, cstParsed, revC, newC) {
 
   if (accDown && salUp) {
     const prefix = '접속 시간은 감소하였는데 매출은 증가하셨네요! ';
+    if (!cstParsed && isNaN(revC) && isNaN(newC)) return prefix.trim();
     const matches = [];
     if (cstMin >= 20) matches.push(prefix + '내담자분들과의 장콜 유지가 매출 증가에도 긍정적인 영향을 준 것으로 보여요!');
     if (rev >= 50)    matches.push(prefix + '기존 내담자분들의 지속적인 재방문이 매출 증가에도 긍정적인 영향을 준 것으로 보여요!');
-    if (newCnt >= 50) matches.push(prefix + '내담자 분들이 이번달에 특히 더 유입된 것 같아요!');
+    if (newCnt >= 50) matches.push(prefix + '내담자 분들이 ' + month + '에 특히 더 유입된 것 같아요!');
 
     if (matches.length >= 2) return pickRandom(matches);
     if (matches.length === 1) return matches[0];
@@ -511,23 +523,23 @@ function getAccSalComment(accRate, salRate, cstParsed, revC, newC) {
     // 전부 미해당 → 완화된 기준
     if (cstMin >= 15) return prefix + '내담자분들과의 장콜 유지가 매출 증가에도 긍정적인 영향을 준 것으로 보여요!';
     if (rev >= 40)    return prefix + '기존 내담자분들의 지속적인 재방문이 매출 증가에도 긍정적인 영향을 준 것으로 보여요!';
-    if (newCnt >= 30) return prefix + '내담자 분들이 이번달에 특히 더 유입된 것 같아요!';
+    if (newCnt >= 30) return prefix + '내담자 분들이 ' + month + '에 특히 더 유입된 것 같아요!';
 
     // 셋 다 미해당 → 가장 높은 지표 기준
     const scores = [
-      { msg: prefix + '내담자분들과의 장콜 유지가 매출 증가에도 긍정적인 영향을 준 것으로 보여요!', val: cstMin / 20 },
-      { msg: prefix + '기존 내담자분들의 지속적인 재방문이 매출 증가에도 긍정적인 영향을 준 것으로 보여요!', val: rev / 50 },
-      { msg: prefix + '내담자 분들이 이번달에 특히 더 유입된 것 같아요!', val: newCnt / 50 }
+      { msg: prefix + '내담자분들과의 장콜 유지가 매출 증가에도 긍정적인 영향을 준 것으로 보여요!', val: cstParsed ? cstMin / 20 : -1 },
+      { msg: prefix + '기존 내담자분들의 지속적인 재방문이 매출 증가에도 긍정적인 영향을 준 것으로 보여요!', val: isNaN(revC) ? -1 : rev / 50 },
+      { msg: prefix + '내담자 분들이 ' + month + '에 특히 더 유입된 것 같아요!', val: isNaN(newC) ? -1 : newCnt / 50 }
     ];
     scores.sort((a, b) => b.val - a.val);
-    return scores[0].msg;
+    return scores[0].val > 0 ? scores[0].msg : prefix.trim();
   }
 
   if (accUp && salDown) {
     const prefix = '접속 시간은 증가하였는데 매출은 감소하셨네요! ';
     const matches = [];
-    if (cstMin < 15) matches.push(prefix + '내담자 분들의 상담 시간이 줄어듦에 따라 매출이 감소한 것으로 보여요!');
-    if (rev <= 30)   matches.push(prefix + '기존 내담자 분들의 접속량이 줄어듦에 따라 매출이 감소한 것으로 보여요!');
+    if (cstParsed && cstMin < 15) matches.push(prefix + '내담자 분들의 상담 시간이 줄어듦에 따라 매출이 감소한 것으로 보여요!');
+    if (!isNaN(revC) && rev <= 30)   matches.push(prefix + '기존 내담자 분들의 접속량이 줄어듦에 따라 매출이 감소한 것으로 보여요!');
 
     // 상담시간 15분↑ + 재방문율 30% 초과 둘 다 충족 → 신규유입 문구
     if (cstMin >= 15 && rev > 30) return prefix + '신규 내담자 유입이나 상담 전환 등 여러 요인이 영향을 주었을 수 있을 것 같아요. 앞으로도 꾸준히 활동해 주시면 좋겠습니다!';
@@ -569,7 +581,7 @@ function fmtDate(t) {
   return d.getFullYear() + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0');
 }
 function ymKey(h) { const n = parseInt(h.month, 10); return h.year * 100 + (isNaN(n) ? 0 : n); }
-function onMonthInput() { autoYear(); renderPeople(); updateSelect(); if (document.getElementById('r-person').value !== '') onPersonChange(); }
+function onMonthInput() { autoYear(); renderPeople(); updateSelect(); if (document.getElementById('r-person').value !== '') loadPrefill(); }
 function onYearInput() { yearTouched = true; renderPeople(); updateSelect(); }
 
 function previewBulk() {
@@ -698,10 +710,12 @@ function generate() {
   const accC = parseFloat(document.getElementById('acc-c').value);
   const salP = getRawNum('sal-p');
   const salC = getRawNum('sal-c');
-  const cstParsed = parseMinSec(document.getElementById('cst-c').value);
-  if (!cstParsed) { alert('평균 상담 시간을 입력해 주세요. (예: 1427 또는 14.27)'); return; }
+  const cstRaw = document.getElementById('cst-c').value;
+  const cstParsed = parseMinSec(cstRaw);
+  if (cstRaw.trim() && !cstParsed) { alert('평균 상담 시간 형식을 확인해 주세요. (예: 1427 또는 14.27)'); return; }
   const calC = parseFloat(document.getElementById('cal-c').value);
-  const revC = parseFloat(document.getElementById('rev-c').value);
+  const revRaw = parseFloat(document.getElementById('rev-c').value);
+  const revC = isNaN(revRaw) ? NaN : Math.round(revRaw);   // 소수점은 반올림해서 화면 표시와 판단 기준을 일치
   const newC = parseFloat(document.getElementById('new-c').value);
 
   const accRate = calcRate(accP, accC);
@@ -720,7 +734,7 @@ function generate() {
   const consultLine = getConsultLine(cstParsed, revC, calC);
   const revIsZero = isNaN(revC) || revC === 0;
   const goalLine = getGoalLine(cstParsed, revC, newC);
-  const accSalComment = getAccSalComment(accRate, salRate, cstParsed, revC, newC);
+  const accSalComment = getAccSalComment(accRate, salRate, cstParsed, revC, newC, month);
   const newDisplay = !isNaN(newC) ? Math.round(newC) + '명' : '-';
 
   const lines = [
@@ -735,7 +749,7 @@ function generate() {
     '',
     accSalComment,
     '',
-    '지난달 신규 내담자는 ' + newDisplay + ' 유입되었으며,',
+    !isNaN(newC) ? month + ' 신규 내담자는 ' + newDisplay + ' 유입되었으며,' : null,
     '이번달에도 좋은 상담 이어가실 수 있도록 응원하겠습니다.',
     '',
     '감사합니다.',
@@ -781,7 +795,7 @@ function resetInputs() {
 }
 
 // ── 전월 값 자동 입력 ─────────────────────────────
-function onPersonChange() {
+function loadPrefill() {
   const idx = document.getElementById('r-person').value;
   const hint = document.getElementById('prefill-hint');
   hint.textContent = '';
@@ -792,7 +806,19 @@ function onPersonChange() {
   document.getElementById('acc-p').value = r.accC ?? '';
   document.getElementById('sal-p').value = r.salC ?? '';
   fmtComma('sal-p', 'sal-p-pre');
-  hint.textContent = '✓ 지난 기록(' + fmtYM(r.year, r.month) + ')의 당월 값을 전월 칸에 불러왔어요. 다르면 직접 수정하세요.';
+  const ck = curKey(), prevKey = (ck % 100 === 1) ? ck - 89 : ck - 1;
+  hint.innerHTML = '✓ 지난 기록(' + esc(fmtYM(r.year, r.month)) + ')의 당월 값을 전월 칸에 불러왔어요. 다르면 직접 수정하세요.' +
+    (ymKey(r) !== prevKey ? '<br><b style="color:var(--red)">지금 기재된 내용은 전월 데이터가 아닙니다.</b>' : '');
+}
+
+function onPersonChange() {
+  // 사람이 바뀌면 이전 사람의 입력값이 남지 않도록 입력칸을 비우고 전월 값을 다시 불러옴
+  DRAFT_FIELDS.forEach(id => document.getElementById(id).value = '');
+  ['sal-p-pre','sal-c-pre','prev-cst-c'].forEach(id => document.getElementById(id).textContent = '');
+  document.getElementById('prev-cst-c').className = 'preview-text';
+  document.getElementById('template-out').style.display = 'none';
+  currentPersonIdx = null;
+  loadPrefill();
 }
 
 // ── 발송 이력 / 백업 ──────────────────────────────
@@ -888,7 +914,7 @@ function selectNext(sentIdx, sentName) {
   const next = opts.find(o => parseInt(o.value, 10) > sentIdx) || opts[0];
   sel.value = next.value;
   onPersonChange();
-  hint.textContent = '✓ ' + sentName + ' 선생님 복사·발송 완료. ' + hint.textContent;
+  hint.innerHTML = '✓ ' + esc(sentName) + ' 선생님 복사·발송 완료. ' + hint.innerHTML;
 }
 
 function markSent() {
