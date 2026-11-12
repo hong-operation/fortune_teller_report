@@ -78,6 +78,9 @@
   .hist-body.open { display: block; }
   .prefill-hint { font-size: 11px; color: var(--green); margin-top: 8px; min-height: 14px; }
   @media (max-width: 480px) { .grid2 { grid-template-columns: 1fr; } }
+  input:not(:placeholder-shown) ~ .opt-hint { display: none; }   /* 값이 있으면 안내 문구 숨김 */
+  .opt-hint { margin-top: -2px; font-weight: 700; }                                 /* 입력칸 바로 아래에 붙임 */
+  #prev-cst-p:empty { display: none; }                            /* 전월 상담 시간 미리보기는 값이 있을 때만 자리 차지 */
 </style>
 </head>
 <body>
@@ -122,10 +125,10 @@
       </div>
     </div>
     <div class="card">
-      <div class="card-label">평균 상담 시간 (당월)</div>
-      <div class="field">
-        <input type="text" id="cst-c" placeholder="예) 1427 또는 14.27" oninput="previewTime('cst-c','prev-cst-c')">
-        <div class="preview-text" id="prev-cst-c"></div>
+      <div class="card-label">평균 상담 시간</div>
+      <div class="grid2">
+        <div class="field"><label>전월 (선택)</label><input type="text" id="cst-p" placeholder="예) 1620" oninput="previewTime('cst-p','prev-cst-p')"><div class="hint opt-hint">비우면 전월 비교 생략</div><div class="preview-text" id="prev-cst-p"></div></div>
+        <div class="field"><label>당월</label><input type="text" id="cst-c" placeholder="예) 1427" oninput="previewTime('cst-c','prev-cst-c')"><div class="preview-text" id="prev-cst-c"></div></div>
       </div>
       <p class="hint">1427 또는 14.27 입력 시 → 14분 27초로 변환됩니다</p>
     </div>
@@ -134,12 +137,18 @@
       <div class="field"><input type="number" id="cal-c" placeholder="0" min="0"></div>
     </div>
     <div class="card">
-      <div class="card-label">재방문율 (당월)</div>
-      <div class="field"><input type="number" id="rev-c" placeholder="0" min="0" max="100" step="0.1"></div>
+      <div class="card-label">재방문율 (%)</div>
+      <div class="grid2">
+        <div class="field"><label>전월 (선택)</label><input type="number" id="rev-p" placeholder="0" min="0" max="100" step="0.1"><div class="hint opt-hint">비우면 전월 비교 생략</div></div>
+        <div class="field"><label>당월</label><input type="number" id="rev-c" placeholder="0" min="0" max="100" step="0.1"></div>
+      </div>
     </div>
     <div class="card">
-      <div class="card-label">신규 유입 (당월)</div>
-      <div class="field"><input type="number" id="new-c" placeholder="0" min="0"></div>
+      <div class="card-label">신규 유입 (명)</div>
+      <div class="grid2">
+        <div class="field"><label>전월 (선택)</label><input type="number" id="new-p" placeholder="0" min="0"><div class="hint opt-hint">비우면 전월 비교 생략</div></div>
+        <div class="field"><label>당월</label><input type="number" id="new-c" placeholder="0" min="0"></div>
+      </div>
     </div>
     <button class="btn-generate" onclick="generate()">템플릿 생성 →</button>
     <div class="template-out" id="template-out">
@@ -201,7 +210,7 @@ let lastGenerated = null;
 let draft = null;
 let storageErrorShown = false;
 const STORE_KEY = 'counselorReportV1';
-const DRAFT_FIELDS = ['acc-p','acc-c','sal-p','sal-c','cst-c','cal-c','rev-c','new-c'];
+const DRAFT_FIELDS = ['acc-p','acc-c','sal-p','sal-c','cst-c','cal-c','rev-c','new-c','cst-p','rev-p','new-p'];
 
 function save() {
   try {
@@ -265,7 +274,7 @@ function restoreDraft() {
   });
   fmtComma('sal-p','sal-p-pre');
   fmtComma('sal-c','sal-c-pre');
-  previewTime('cst-c','prev-cst-c');
+  previewTime('cst-c','prev-cst-c'); previewTime('cst-p','prev-cst-p');
   if (document.getElementById('r-person').value !== '') {
     document.getElementById('prefill-hint').textContent = '✓ 작성 중이던 내용을 복원했어요.';
   }
@@ -484,7 +493,7 @@ function joinClauses(parts, praise, conns) {
   return s + last + roSuffix(last) + (praise ? ' 잘해주고 계세요!' : ' 확인됩니다.');
 }
 
-function getConsultLine(cstParsed, revC, calC) {
+function getConsultLine(cstParsed, revC, calC, neutral) {
   const hasCst = !!cstParsed, hasCal = !isNaN(calC);
   const cstMin = hasCst ? cstParsed.totalSec / 60 : 0;
   const rev = isNaN(revC) ? 0 : revC;
@@ -494,12 +503,21 @@ function getConsultLine(cstParsed, revC, calC) {
   const revP = revIsZero ? null : '재방문율은 ' + fmtRev(rev);
 
   if (revIsZero) return joinClauses([cstP, calP], false);
-  if (!hasCst) return joinClauses([calP, revP], rev >= 30);
-  if (cstMin >= 13 && rev < 30) return joinClauses([calP, revP, cstP], true, ['이며 ', '이고, ']);
-  return joinClauses([cstP, calP, revP], !(cstMin < 13 && rev < 30));
+  if (!hasCst) return joinClauses([calP, revP], rev >= 30 && !neutral);
+  if (cstMin >= 13 && rev < 30) return joinClauses([calP, revP, cstP], !neutral, ['이며 ', '이고, ']);
+  return joinClauses([cstP, calP, revP], !(cstMin < 13 && rev < 30) && !neutral);
 }
 
 // ── 접속/매출 코멘트 ──────────────────────────────
+// 접속 증가 + 매출 감소, 원인을 짚기 어려울 때 (문장 3개 중 랜덤)
+function accUpSalDownGeneric(prefix) {
+  return pickRandom([
+    prefix + '신규 내담자 유입이나 상담 전환 등 여러 요인이 영향을 주었을 수 있을 것 같아요. 앞으로도 꾸준히 활동해 주시면 좋겠습니다!',
+    '접속은 늘었는데 매출이 줄어든 원인은 신규 유입이나 상담 전환 등 여러 요인이 영향을 주었을 수 있어요. 이번 달에도 꾸준히 활동해 주시면 좋은 결과가 있을 것이라고 생각합니다!',
+    '접속량이 늘어난 만큼 매출도 오르면 좋았을 텐데 아쉽습니다. 여러 요인이 영향을 주었을 수 있으니, 이번 달에도 꾸준히 활동해 주시면 좋겠습니다!'
+  ]);
+}
+
 function getAccSalComment(accRate, salRate, cstParsed, revC, newC, month) {
   const accDown = accRate !== null && accRate < 0;
   const accUp   = accRate !== null && accRate > 0;
@@ -542,15 +560,23 @@ function getAccSalComment(accRate, salRate, cstParsed, revC, newC, month) {
     if (!isNaN(revC) && rev <= 30)   matches.push(prefix + '기존 내담자 분들의 접속량이 줄어듦에 따라 매출이 감소한 것으로 보여요!');
 
     // 상담시간 15분↑ + 재방문율 30% 초과 둘 다 충족 → 신규유입 문구
-    if (cstMin >= 15 && rev > 30) return prefix + '신규 내담자 유입이나 상담 전환 등 여러 요인이 영향을 주었을 수 있을 것 같아요. 앞으로도 꾸준히 활동해 주시면 좋겠습니다!';
+    if (cstMin >= 15 && rev > 30) return accUpSalDownGeneric(prefix);
 
     if (matches.length >= 2) return pickRandom(matches);
     if (matches.length === 1) return matches[0];
-    return prefix + '신규 내담자 유입이나 상담 전환 등 여러 요인이 영향을 주었을 수 있을 것 같아요. 앞으로도 꾸준히 활동해 주시면 좋겠습니다!';
+    return accUpSalDownGeneric(prefix);
   }
 
-  if (accDown && salDown) return '접속량과 매출이 모두 감소하셨어요! 접속량이 감소하면서 매출에도 어느 정도 영향을 준 것으로 보여요. 홍카페 활동을 조금 더 신경 써주시면 감사하겠습니다!';
-  if (accUp && salUp)     return '접속량과 매출이 모두 증가하셨어요! 홍카페 접속량이 증가함에 따라 내담자 유입에 더욱 도움된 것 같습니다!';
+  if (accDown && salDown) return pickRandom([
+    '접속량과 매출이 모두 감소하셨어요...! 접속량이 감소하면서 매출에도 어느 정도 영향을 준 것으로 보여요. 홍카페 활동을 조금 더 신경 써주시면 감사하겠습니다!',
+    '접속량과 매출이 모두 감소했습니다. 접속량이 줄면서 매출에도 영향이 있었던 것으로 보여요. 이번 달에는 홍카페 활동에 조금 더 신경 써 주시면 감사하겠습니다!',
+    '이번 달 활동에서는 접속량과 매출이 모두 줄었어요. 접속량이 줄어든 만큼 매출에도 영향이 있었던 것 같아요. 접속 시간을 조금만 더 늘려주시면 좋은 결과로 이어질 거라고 생각합니다!'
+  ]);
+  if (accUp && salUp) return pickRandom([
+    '접속량과 매출이 모두 증가하셨어요! 홍카페 접속량이 증가함에 따라 내담자 유입에 더욱 도움된 것 같습니다!',
+    '접속량과 매출이 모두 증가했어요! 접속량이 늘면서 내담자분들과 만날 기회도 많아진 것 같아요. 이번 달에도 이어가 주시면 좋을 것 같습니다!',
+    '접속량과 매출이 모두 늘었어요! 꾸준한 활동이 좋은 결과로 이어진 것으로 보여요. 이번 달에도 꾸준하게 활동해 주시면 좋을 것 같아요!'
+  ]);
   return '';
 }
 
@@ -698,6 +724,85 @@ function updateSelect() {
   if (prevName != null) { const ni = people.indexOf(prevName); if (Array.from(sel.options).some(o => o.value === String(ni))) sel.value = ni; }
 }
 
+const CMP_TPL = {
+  R1: ['재방문율이 전월 {P}%에서 {C}%로 증가했습니다! 내담자분들이 꾸준히 찾게 되는 상담을 하고 계신 거예요. 정말 잘하고 계세요!',
+       '재방문율이 전월 {P}%에서 {C}%로 올랐어요! 내담자분들께 신뢰받는 상담을 하고 계신 것 같아요! 잘하고 계세요!',
+       '재방문율이 전월 {P}%에서 {C}%로 증가했습니다! 안정적인 수치를 보여주고 계세요. 지금처럼 이어가 주시면 좋을 것 같아요!'],
+  R2: ['재방문율이 전월 {P}%에서 {C}%로 증가했습니다! 다시 찾아주시는 내담자분들이 늘고 있다는 좋은 신호예요. 이 흐름을 이어가 보세요!',
+       '재방문율이 전월 {P}%에서 {C}%로 올랐어요! 한 번 상담하신 내담자분들이 다시 찾아주고 계신다는 뜻이라 반가운 변화예요. 앞으로도 좋은 상담 기대할게요!',
+       '재방문율이 전월 {P}%에서 {C}%로 증가했습니다! 내담자분들께 좋은 상담이 쌓이고 있다는 신호로 보여요. 이번 달에도 이어가 보시면 좋겠어요.'],
+  R3: ['재방문율은 전월과 비슷한 {C}%로, 안정적으로 유지하고 계세요!',
+       '재방문율이 전월과 비슷한 {C}% 수준을 유지하고 있어요. 안정적인 수치라 현재처럼 유지해 주시면 좋을 것 같아요!',
+       '재방문율은 전월과 비슷한 {C}%예요. 꾸준히 찾아주시는 내담자분들이 계신다는 뜻이라 꾸준하게 활동해 주시면 좋을 것 같아요!'],
+  R4: ['재방문율은 전월과 비슷한 {C}%예요. 내담자분들이 궁금해할 만한 것들을 잘 캐치해서 상담해 보시면 재방문율을 높이는 데 도움이 될 수 있어요.',
+       '재방문율은 전월과 비슷한 {C}%예요. 상담을 하면서 내담자가 궁금해할 만한 것들을 먼저 리드해 주시면 재방문율을 높이는 데 도움이 될 수 있어요.',
+       '재방문율이 전월과 비슷한 {C}% 수준이에요. 한 번 더 찾아오고 싶은 상담이 될 수 있도록 이번 달에는 상담 내용에 조금 더 신경 써 보시면 좋을 것 같아요!'],
+  R5: ['재방문율이 전월 {P}%에서 {C}%로 내려갔지만 여전히 안정적인 수준이에요. 지금처럼 이어가 주세요!',
+       '재방문율이 전월 {P}%에서 {C}%로 감소했지만, 안정적인 수치는 유지하고 계세요! 이번 달에도 좋은 상담 기대할게요.',
+       '재방문율이 전월 {P}%에서 {C}%로 감소했어요. 여전히 안정적인 수준이니, 이번 달에 다시 올릴 수 있도록 지금처럼 이어가 주세요!'],
+  R6: ['재방문율이 전월 {P}%에서 {C}%로 내려갔습니다. 이번 달에는 단골 내담자를 확보하기 위해 조금 더 신경 써 주시면 좋을 것 같습니다!',
+       '재방문율이 전월 {P}%에서 {C}%로 감소했어요. 상담이 끝난 뒤 내담자분들께 다음 상담을 편하게 안내해 보시는 것도 방법이에요.',
+       '재방문율이 전월 {P}%에서 {C}%로 내려갔어요. 단골 내담자분들이 다시 찾아주실 수 있도록, 이번 달에는 상담 마무리에 조금 더 신경 써 보시면 좋겠어요.'],
+  T1: ['평균 상담 시간이 전월 {P}에서 {C}{로} 증가했습니다! 내담자분들과의 상담에서 충분히 잘하고 계신 것으로 보여요!',
+       '평균 상담 시간이 전월 {P}에서 {C}{로} 늘었어요! 내담자분들과 충분히 소통하고 계신 것 같아요. 지금처럼 이어가 주세요!',
+       '평균 상담 시간이 전월 {P}에서 {C}{로} 증가했습니다! 내담자분들의 이야기를 깊이 들어주고 계신 덕분이에요.'],
+  T2: ['평균 상담 시간이 전월 {P}에서 {C}{로} 증가했습니다! 조금만 더 여유 있게 상담을 이끌어 보시면 더 좋을 것 같아요.',
+       '평균 상담 시간이 전월 {P}에서 {C}{로} 늘었어요! 좋은 변화예요. 이 흐름으로 상담을 조금 더 길게 이어가 보시면 좋을 것 같아요!',
+       '평균 상담 시간이 전월 {P}에서 {C}{로} 증가했습니다! 내담자분들과 이야기를 나누는 시간이 늘고 있어서 좋은 변화예요.'],
+  T3: ['평균 상담 시간은 전월과 비슷한 {C}{로} 꾸준히 유지하고 계세요!',
+       '평균 상담 시간이 전월과 비슷한 {C} 수준이에요. 꾸준히 충분한 상담을 이어가고 계세요!',
+       '평균 상담 시간은 전월과 비슷한 {C} 수준으로, 안정적으로 유지되고 있어요.'],
+  T4: ['평균 상담 시간은 전월과 비슷한 {C} 수준이에요. 조금만 더 여유 있게 상담을 이끌어 보시면 좋을 것 같아요.',
+       '평균 상담 시간이 전월과 비슷한 {C} 수준이에요. 내담자분들의 이야기를 조금 더 이끌어 주시면 상담 만족도에 도움이 될 수 있어요.',
+       '평균 상담 시간은 전월과 비슷한 {C} 수준이에요. 이번 달에는 상담을 조금 더 길게 이어가 보시면 좋을 것 같아요!'],
+  T5: ['평균 상담 시간이 전월 {P}에서 {C}{로} 감소했지만 여전히 충분히 잘하고 계세요!',
+       '평균 상담 시간이 전월 {P}에서 {C}{로} 줄었지만, 여전히 충분히 긴 상담을 하고 계세요. 지금처럼 이어가 주세요!',
+       '평균 상담 시간이 전월 {P}에서 {C}{로} 감소했어요. 그래도 내담자분들과 충분히 소통하고 계신 수준이에요!'],
+  T6: ['평균 상담 시간이 전월 {P}에서 {C}{로} 줄었어요. 상담이 짧아지면 재방문이나 매출에 영향을 줄 수 있어서, 이번 달에는 조금 더 여유 있게 상담을 이어가 보시면 좋겠어요.',
+       '평균 상담 시간이 전월 {P}에서 {C}{로} 감소했습니다. 내담자분들과 이야기를 조금 더 나눠 보시면 만족도와 재방문에도 도움이 될 수 있어요.',
+       '평균 상담 시간이 전월 {P}에서 {C}{로} 줄었어요. 내담자분들이 궁금해하시는 부분을 충분히 풀어 드릴 수 있도록, 이번 달에는 여유 있게 상담해 보시면 좋을 것 같아요!'],
+  N1: ['신규 내담자가 전월 {P}명에서 {C}명으로 증가했습니다! 신규 내담자분들께 많이 선택받고 계신 거예요.',
+       '{월} 신규 내담자는 전월 {P}명에서 {C}명으로 늘었어요! 새로 찾아주시는 분들이 많아지고 있어요. 좋은 흐름이에요!',
+       '신규 내담자가 전월 {P}명에서 {C}명으로 늘었어요. 선생님을 새로 찾아주시는 내담자분들이 늘고 있다는 반가운 소식이에요!'],
+  N2: ['신규 내담자는 전월과 비슷한 {C}명으로 꾸준히 유입되고 있습니다.',
+       '신규 내담자가 전월과 비슷한 {C}명이에요. 꾸준히 유입되고 있는 것으로 확인되어요!',
+       '{월} 신규 내담자는 전월과 비슷한 {C}명으로, 꾸준히 새로운 분들이 찾아주고 계세요!'],
+  N3: ['신규 내담자는 전월과 비슷한 {C}명입니다. 프로필 정보를 한 번 점검해 보시는 것도 좋을 것 같아요.',
+       '신규 내담자가 전월과 비슷한 {C}명이에요. 프로필 정보를 한 번 다듬어 보시면 도움이 될 수 있어요.',
+       '신규 내담자는 전월과 비슷한 {C}명이에요. 접속 시간대를 조금 넓혀 보시는 것도 좋을 것 같아요.'],
+  N4: ['신규 내담자가 전월 {P}명에서 {C}명으로 감소했어요. 프로필 정보나 접속 시간대를 한 번 점검해 보셔도 좋을 것 같아요.',
+       '신규 내담자가 전월 {P}명에서 {C}명으로 줄었어요. 새로 찾아주시는 분들이 늘 수 있도록 프로필 소개를 한 번 다듬어 보시면 좋을 것 같아요.',
+       '{월} 신규 내담자는 전월 {P}명에서 {C}명으로 감소했습니다. 접속 시간대를 조금 조정해 보시는 것도 도움이 될 수 있어요.'],
+};
+
+function fillTpl(t, v) {
+  return t.replace('{P}', v.P).replace('{C}', v.C).replace('{월}', v.m).replace('{로}', v.ro || '');
+}
+
+// 전월 대비 비교 문장 (전월 값이 없거나 0이면 해당 지표는 생략)
+function getCompareLines(month, cstC, cstP, revC, revP, newC, newP) {
+  const out = [];
+  let hasNew = false;
+  if (!isNaN(revC) && revC > 0 && !isNaN(revP) && revP > 0) {          // 재방문율: 5%p 이상 차이
+    const d = revC - revP, hi = revC >= 50;
+    const k = Math.abs(d) < 5 ? (hi ? 'R3' : 'R4') : d > 0 ? (hi ? 'R1' : 'R2') : (hi ? 'R5' : 'R6');
+    out.push(fillTpl(pickRandom(CMP_TPL[k]), { P: revP, C: revC }));
+  }
+  if (cstC && cstP && cstC.totalSec > 0 && cstP.totalSec > 0) {        // 상담 시간: 전월의 5% 이상 차이
+    const r = (cstC.totalSec - cstP.totalSec) / cstP.totalSec, min = cstC.totalSec / 60;
+    const k = Math.abs(r) < 0.05 ? (min >= 13 ? 'T3' : 'T4') : r > 0 ? (min >= 13 ? 'T1' : 'T2') : (min >= 20 ? 'T5' : 'T6');
+    const cs = fmtMinSec(cstC);
+    out.push(fillTpl(pickRandom(CMP_TPL[k]), { P: fmtMinSec(cstP), C: cs, ro: roSuffix(cs) }));
+  }
+  if (!isNaN(newC) && !isNaN(newP) && newP > 0) {                      // 신규 유입: 전월의 10% 이상 차이
+    const r = (newC - newP) / newP;
+    const k = Math.abs(r) < 0.1 ? (newC >= 11 ? 'N2' : 'N3') : r > 0 ? 'N1' : 'N4';
+    out.push(fillTpl(pickRandom(CMP_TPL[k]), { P: Math.round(newP), C: Math.round(newC), m: month }));
+    hasNew = true;
+  }
+  return { lines: out, hasNew };
+}
+
 // ── 템플릿 생성 ───────────────────────────────────
 function generate() {
   if (!curMonthLabel()) { alert('기준 월을 입력해 주세요. (예: 11)'); return; }
@@ -731,7 +836,9 @@ function generate() {
   const salSuffix = salRate === 0 ? '했습니다.' : '했습니다.';
 
   const greeting = personName ? personName + ' 선생님 안녕하세요! ' : '안녕하세요! ';
-  const consultLine = getConsultLine(cstParsed, revC, calC);
+  const revPv = parseFloat(document.getElementById('rev-p').value);
+  const cmp = getCompareLines(month, cstParsed, parseMinSec(document.getElementById('cst-p').value), revC, isNaN(revPv) ? NaN : Math.round(revPv), newC, parseFloat(document.getElementById('new-p').value));
+  const consultLine = getConsultLine(cstParsed, revC, calC, cmp.lines.length > 0);
   const revIsZero = isNaN(revC) || revC === 0;
   const goalLine = getGoalLine(cstParsed, revC, newC);
   const accSalComment = getAccSalComment(accRate, salRate, cstParsed, revC, newC, month);
@@ -743,14 +850,19 @@ function generate() {
     compareLine(accRate, salRate, accStr, salStr),
     '',
     consultLine,
+    ...cmp.lines.flatMap(l => ['', l]),   // 비교 문장마다 앞에 빈 줄을 넣어 가독성 확보
     '',
     !revIsZero ? '재방문율은 2회 이상 통화한 내담자 비율로 50% 이상일 경우 안정적인 수치로 보고 있어요!' : null,
     goalLine,
     '',
     accSalComment,
     '',
-    !isNaN(newC) ? month + ' 신규 내담자는 ' + newDisplay + ' 유입되었으며,' : null,
-    '이번달에도 좋은 상담 이어가실 수 있도록 응원하겠습니다.',
+    !isNaN(newC) && !cmp.hasNew ? month + ' 신규 내담자는 ' + newDisplay + ' 유입되었으며,' : null,
+    pickRandom([
+      '이번 달에도 좋은 상담 이어가실 수 있도록 응원하겠습니다.',
+      '이번 달에도 선생님의 좋은 상담을 응원하겠습니다.',
+      '한 달간 수고 많으셨습니다. 이번 달에도 좋은 상담 이어가실 수 있도록 응원하겠습니다.'
+    ]),
     '',
     '감사합니다.',
   ].filter(l => l !== null);
@@ -788,7 +900,7 @@ function copyTpl() {
 
 function resetInputs() {
   ['acc-p','acc-c','sal-p','sal-c','cst-c','cal-c','rev-c','new-c'].forEach(id => document.getElementById(id).value = '');
-  ['sal-p-pre','sal-c-pre','prev-cst-c'].forEach(id => document.getElementById(id).textContent = '');
+  ['sal-p-pre','sal-c-pre','prev-cst-c','prev-cst-p'].forEach(id => document.getElementById(id).textContent = '');
   document.getElementById('r-person').value = '';
   document.getElementById('template-out').style.display = 'none';
   document.getElementById('prefill-hint').textContent = '';
@@ -807,14 +919,19 @@ function loadPrefill() {
   document.getElementById('sal-p').value = r.salC ?? '';
   fmtComma('sal-p', 'sal-p-pre');
   const ck = curKey(), prevKey = (ck % 100 === 1) ? ck - 89 : ck - 1;
+  const isPrev = ymKey(r) === prevKey;
+  document.getElementById('cst-p').value = isPrev ? (r.cst || '') : '';
+  document.getElementById('rev-p').value = isPrev ? (r.rev ?? '') : '';
+  document.getElementById('new-p').value = isPrev ? (r.newC ?? '') : '';
+  previewTime('cst-p','prev-cst-p');
   hint.innerHTML = '✓ 지난 기록(' + esc(fmtYM(r.year, r.month)) + ')의 당월 값을 전월 칸에 불러왔어요. 다르면 직접 수정하세요.' +
-    (ymKey(r) !== prevKey ? '<br><b style="color:var(--red)">지금 기재된 내용은 전월 데이터가 아닙니다.</b>' : '');
+    (ymKey(r) !== prevKey ? '<br><b style="color:var(--red)">지금 기재된 내용은 전월 데이터가 아닙니다.</b> 상담 시간·재방문율·신규 유입 전월 칸은 비워 뒀어요.' : '');
 }
 
 function onPersonChange() {
   // 사람이 바뀌면 이전 사람의 입력값이 남지 않도록 입력칸을 비우고 전월 값을 다시 불러옴
   DRAFT_FIELDS.forEach(id => document.getElementById(id).value = '');
-  ['sal-p-pre','sal-c-pre','prev-cst-c'].forEach(id => document.getElementById(id).textContent = '');
+  ['sal-p-pre','sal-c-pre','prev-cst-c','prev-cst-p'].forEach(id => document.getElementById(id).textContent = '');
   document.getElementById('prev-cst-c').className = 'preview-text';
   document.getElementById('template-out').style.display = 'none';
   currentPersonIdx = null;
