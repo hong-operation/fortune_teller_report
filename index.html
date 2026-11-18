@@ -610,23 +610,33 @@ function ymKey(h) { const n = parseInt(h.month, 10); return h.year * 100 + (isNa
 function onMonthInput() { autoYear(); renderPeople(); updateSelect(); if (document.getElementById('r-person').value !== '') loadPrefill(); }
 function onYearInput() { yearTouched = true; renderPeople(); updateSelect(); }
 
-function previewBulk() {
+function parseBulk() {
   const raw = document.getElementById('bulk-input').value;
-  const names = raw.split(/[\s\n]+/).map(n => n.trim()).filter(n => n.length > 0);
+  const all = raw.split(/[\s\n]+/).map(n => n.trim()).filter(n => n.length > 0);
+  const toAdd = [], skipped = [];
+  all.forEach(n => { if (people.includes(n) || toAdd.includes(n)) skipped.push(n); else toAdd.push(n); });
+  return { all, toAdd, skipped };
+}
+
+function previewBulk() {
+  const { all, toAdd, skipped } = parseBulk();
   const el = document.getElementById('bulk-preview');
-  if (!names.length) { el.textContent = ''; return; }
-  el.textContent = names.length + '명 인식됨 : ' + names.join(', ');
+  if (!all.length) { el.textContent = ''; return; }
+  let msg = toAdd.length ? toAdd.length + '명 추가 예정 : ' + toAdd.join(', ') : '추가할 인원이 없습니다';
+  if (skipped.length) msg += ' · ' + skipped.length + '명 제외(중복값) : ' + Array.from(new Set(skipped)).join(', ');
+  el.textContent = msg;
 }
 
 function addBulk() {
-  const raw = document.getElementById('bulk-input').value;
-  const names = raw.split(/[\s\n]+/).map(n => n.trim()).filter(n => n.length > 0);
-  if (!names.length) return;
-  names.forEach(n => { if (!people.includes(n)) people.push(n); });
+  const { all, toAdd, skipped } = parseBulk();
+  if (!all.length) return;
+  toAdd.forEach(n => people.push(n));
   document.getElementById('bulk-input').value = '';
-  document.getElementById('bulk-preview').textContent = '';
   renderPeople();
   updateSelect();
+  let msg = toAdd.length + '명 추가됨';
+  if (skipped.length) msg += ' · ' + skipped.length + '명 제외(중복값)';
+  document.getElementById('bulk-preview').textContent = msg;
 }
 
 function switchTab(t) {
