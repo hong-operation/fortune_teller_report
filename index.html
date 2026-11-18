@@ -102,6 +102,16 @@
   .guide-list li { position: relative; padding-left: 1em; font-size: 12px; line-height: 1.7; color: var(--text-muted); margin-top: 6px; }
   .guide-list li::before { content: '·'; position: absolute; left: 0; font-weight: 700; }
   @media (max-width: 480px) { .tab { padding: 8px 12px; } }
+  /* ── 업데이트 이력 (접이식) ── */
+  .log-card summary { list-style: none; cursor: pointer; display: flex; align-items: center; font-size: 10px; font-weight: 600; color: var(--text-hint); letter-spacing: .08em; }
+  .log-card summary::-webkit-details-marker { display: none; }
+  .log-card summary::after { content: '+'; margin-left: auto; font-size: 14px; font-weight: 400; color: var(--text-muted); }
+  .log-card[open] summary { margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .log-card[open] summary::after { content: '\2212'; }
+  .log-list { list-style: none; }
+  .log-list li { display: flex; gap: 12px; font-size: 12px; line-height: 1.7; color: var(--text-muted); margin-top: 6px; }
+  .log-list li:first-child { margin-top: 0; }
+  .log-ver { flex-shrink: 0; min-width: 34px; font-weight: 600; color: var(--text); }
 </style>
 </head>
 <body>
@@ -280,6 +290,13 @@
         <li>작성 중이던 내용이 남아 있으면 기준 월도 그때 값으로 복원되니 확인해 주세요.</li>
       </ul>
     </div>
+
+    <details class="card log-card">
+      <summary>업데이트 이력 <span class="count-info">현재 v0.1</span></summary>
+      <ul class="log-list">
+        <li><span class="log-ver">v0.1</span><span>최초 배포</span></li>
+      </ul>
+    </details>
   </div>
 </div>
 
